@@ -1,7 +1,12 @@
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
+import { createRuntime } from './runtime.js';
 
 const config = loadConfig();
-createApp(config).listen(config.port, () => {
+const { sync } = await createRuntime(config);
+
+createApp(config, {
+  onGitHubEvent: (event, payload) => sync.handleEvent(event, payload),
+}).listen(config.port, () => {
   console.log(`github-gigs listening on :${config.port}`);
 });

@@ -11,9 +11,11 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "backfill": "node scripts/backfill.js",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "pg": "^8.23.1"
   }
 }

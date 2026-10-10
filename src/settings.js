@@ -4,6 +4,11 @@ import { readFileSync } from 'node:fs';
 // The defaults are generic; a deployment points GIGS_CONFIG at a JSON file
 // (see config/anilounge.json) to tune them.
 export const DEFAULTS = {
+  // Names of the Project's fields.
+  fields: { status: 'Status', difficulty: 'Difficulty', bounty: 'Bounty', area: 'Area' },
+  // Statuses that get a forum post. Any other status (including blank, Done)
+  // removes it, as do closing the issue and removing it from the Project.
+  postStatuses: ['Open', 'Claimed', 'In review'],
   // Project "Area" value or issue label -> forum tag name.
   areaTags: {},
   // Other issue labels -> forum tag name.

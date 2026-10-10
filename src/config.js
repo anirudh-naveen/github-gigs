@@ -9,6 +9,11 @@ const REQUIRED = [
   'DISCORD_BOT_TOKEN',
   'DISCORD_GIG_CHANNEL_ID',
   'GITHUB_WEBHOOK_SECRET',
+  'GITHUB_APP_ID',
+  'GITHUB_APP_PRIVATE_KEY',
+  'GITHUB_INSTALLATION_ID',
+  'GITHUB_PROJECT_ID',
+  'DATABASE_URL',
 ];
 
 export function loadConfig(env = process.env) {
@@ -28,10 +33,12 @@ export function loadConfig(env = process.env) {
       maintainerRoleId: env.DISCORD_MAINTAINER_ROLE_ID || null,
     },
     github: {
-      appId: env.GITHUB_APP_ID || null,
-      privateKey: env.GITHUB_APP_PRIVATE_KEY || null,
+      appId: env.GITHUB_APP_ID,
+      privateKey: env.GITHUB_APP_PRIVATE_KEY,
+      installationId: env.GITHUB_INSTALLATION_ID,
       webhookSecret: env.GITHUB_WEBHOOK_SECRET,
-      projectId: env.GITHUB_PROJECT_ID || null,
+      projectId: env.GITHUB_PROJECT_ID,
     },
+    databaseUrl: env.DATABASE_URL,
   };
 }

@@ -1,4 +1,6 @@
 {
+  "fields": { "status": "Status", "difficulty": "Difficulty", "bounty": "Bounty", "area": "Area" },
+  "postStatuses": ["Open", "Claimed", "In review"],
   "areaTags": {
     "frontend": "Frontend",
     "backend": "Backend",

@@ -13,6 +13,11 @@ const env = {
   DISCORD_GIG_CHANNEL_ID: 'chan',
   DISCORD_DEVELOPER_ROLE_ID: 'dev',
   GITHUB_WEBHOOK_SECRET: 'hook',
+  GITHUB_APP_ID: '1',
+  GITHUB_APP_PRIVATE_KEY: 'key',
+  GITHUB_INSTALLATION_ID: '2',
+  GITHUB_PROJECT_ID: 'PVT_1',
+  DATABASE_URL: 'postgres://localhost/test',
 };
 
 async function withServer(overrides, fn) {

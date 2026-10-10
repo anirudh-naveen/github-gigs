@@ -46,9 +46,9 @@ but any claim is kept. `/claim` works on every board, and `/gigs` groups gigs by
 Each forum needs its own copies of the tags it uses.
 
 Postgres stores which item owns which post, so the bot can still delete the post after
-the item is gone from the Project. `npm run backfill` (`railway run npm run backfill`
-on Railway) brings the whole board up to date. Run it once after setup, or any time
-the bot was down.
+the item is gone from the Project. On every start, the bot runs a backfill that brings
+the whole board up to date, so it catches up after downtime by itself. `npm run backfill`
+does the same by hand.
 
 ## Claiming gigs
 
@@ -120,6 +120,9 @@ Difficulty tags use the Project's Difficulty value (for example `Easy`).
 
 ## Setup
 
+For a full step-by-step walkthrough, see [docs/anilounge/setup.md](docs/anilounge/setup.md).
+The steps below are the summary.
+
 1. **GitHub org.** Your repo and Project must belong to an organization, because
    GitHub only sends `projects_v2_item` webhooks for org-owned Projects. Create the
    gig Project there (AniLounge's is **AniLounge Gigs**). For multiple boards, add a
@@ -139,8 +142,8 @@ Difficulty tags use the Project's Difficulty value (for example `Easy`).
 3. **Discord application.**
    - Set the Interactions Endpoint URL to `https://<railway-domain>/discord/interactions`.
    - Invite the bot with the `bot` and `applications.commands` scopes.
-   - On the gig forum, give it View Channel, Send Messages, Create Posts, Manage
-     Threads, and Manage Messages.
+   - On each gig forum, give it View Channel, Create Posts, Send Messages in Posts,
+     Manage Threads, and Manage Messages.
    - Find the forum's channel ID: it is the last number in
      `discord.com/channels/<guild>/<channel>`.
    - Create one forum channel per board (AniLounge: Code, Content, Art), each with
@@ -153,8 +156,9 @@ Difficulty tags use the Project's Difficulty value (for example `Easy`).
    variables listed in `.env.example`; secrets live only there. `PUBLIC_URL` is the
    service's Railway domain. Deploy, then run:
    - `railway run npm run register-commands`. Set `DISCORD_GUILD_ID` first if you
-     want the commands to appear instantly in one server.
-   - `railway run npm run backfill`
+     want the commands to appear instantly in one server. It runs on your machine
+     with Railway's variables and doesn't need the database.
+   - The bot fills the boards by itself on start-up.
 
 ## Development
 

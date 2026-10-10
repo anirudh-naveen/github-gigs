@@ -1,6 +1,7 @@
 // Makes every forum post match the Project: posts missing gigs, refreshes
 // existing ones, and deletes posts for gigs that are gone. Safe to rerun.
-//   railway run npm run backfill
+// The server already does this on every start; this is for running it by hand
+// somewhere that can reach the database (e.g. `railway ssh`, then npm run backfill).
 import { loadConfig } from '../src/config.js';
 import { createRuntime } from '../src/runtime.js';
 

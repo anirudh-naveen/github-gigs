@@ -13,6 +13,10 @@ createApp(config, {
   onLinkCallback: (query) => claims.linkCallback(query),
 }).listen(config.port, () => {
   console.log(`github-gigs listening on :${config.port}`);
+  // Catch up on anything missed while the bot was down (or never ran).
+  sync.backfill()
+    .then((counts) => console.log(`startup backfill: ${JSON.stringify(counts)}`))
+    .catch((err) => console.log(`startup backfill failed: ${err.message}`));
 });
 
 async function expireClaims() {

@@ -1,5 +1,5 @@
 import { resolveBoards } from './boards.js';
-import { loadSettings } from './settings.js';
+import { settingsFromEnv } from './settings.js';
 
 // Reads settings from the environment. Secrets are never logged: errors name
 // the missing variables, not their values.
@@ -22,7 +22,7 @@ export function loadConfig(env = process.env) {
   if (missing.length) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
-  const board = loadSettings(env.GIGS_CONFIG);
+  const board = settingsFromEnv(env);
   if (board.claims.requireApproval && !env.DISCORD_MAINTAINER_ROLE_ID) {
     throw new Error('DISCORD_MAINTAINER_ROLE_ID is required when claims need approval');
   }

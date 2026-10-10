@@ -1,0 +1,19 @@
+{
+  "$comment": "Copy this file, or paste its contents into GIGS_CONFIG_JSON. Every key is optional; see the README's Configuration table.",
+  "fields": { "status": "Status", "difficulty": "Difficulty", "bounty": "Bounty", "area": "Area", "type": "Type" },
+  "postStatuses": ["Open", "Claimed", "In review"],
+  "statuses": { "open": "Open", "claimed": "Claimed" },
+  "boards": [
+    { "name": "Docs", "channel": "$DISCORD_DOCS_CHANNEL_ID", "types": ["Docs"], "labels": ["documentation"] }
+  ],
+  "defaultBoard": "Code",
+  "areaTags": { "frontend": "Frontend", "backend": "Backend" },
+  "labelTags": { "enhancement": "Feature", "bug": "Bug Fix", "good first issue": "Good First Issue" },
+  "privateAreas": ["security"],
+  "claimedTag": "Claimed",
+  "claims": {
+    "requireApproval": true,
+    "maxActivePerUser": 2,
+    "expireDaysAfterLastCommit": 7
+  }
+}

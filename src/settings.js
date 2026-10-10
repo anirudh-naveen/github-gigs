@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 
 // Board settings: everything that differs between projects using this bot.
-// The defaults are generic; a deployment points GIGS_CONFIG at a JSON file
-// (see config/anilounge.json) to tune them.
+// The defaults are generic. A deployment tunes them with a JSON file named by
+// GIGS_CONFIG (see config/example.json), or the same JSON inline in
+// GIGS_CONFIG_JSON, which lets you deploy this repo without forking it.
 export const DEFAULTS = {
   // Names of the Project's fields.
   fields: { status: 'Status', difficulty: 'Difficulty', bounty: 'Bounty', area: 'Area', type: 'Type' },
@@ -44,4 +45,18 @@ function merge(base, over) {
 export function loadSettings(path, read = (p) => readFileSync(p, 'utf8')) {
   if (!path) return DEFAULTS;
   return merge(DEFAULTS, JSON.parse(read(path)));
+}
+
+export function settingsFromEnv(env) {
+  if (env.GIGS_CONFIG && env.GIGS_CONFIG_JSON) {
+    throw new Error('Set GIGS_CONFIG or GIGS_CONFIG_JSON, not both');
+  }
+  if (env.GIGS_CONFIG_JSON) {
+    try {
+      return merge(DEFAULTS, JSON.parse(env.GIGS_CONFIG_JSON));
+    } catch (err) {
+      throw new Error(`GIGS_CONFIG_JSON is not valid JSON: ${err.message}`);
+    }
+  }
+  return loadSettings(env.GIGS_CONFIG);
 }

@@ -106,6 +106,21 @@ query($id: ID!) {
   }
 }`;
 
+const PROJECT_FIELDS_QUERY = `
+query($id: ID!) {
+  node(id: $id) {
+    ... on ProjectV2 {
+      title
+      fields(first: 50) {
+        nodes {
+          ... on ProjectV2FieldCommon { name dataType }
+          ... on ProjectV2SingleSelectField { options { name } }
+        }
+      }
+    }
+  }
+}`;
+
 function fieldText(value) {
   if (!value) return '';
   if (value.name != null) return value.name;
@@ -258,6 +273,28 @@ export function createGitHubClient(
         .filter(Boolean)
         .map((d) => new Date(d));
       return dates.length ? new Date(Math.max(...dates)) : null;
+    },
+
+    // GET as the App itself (not an installation), e.g. /app/hook/config.
+    async appGet(path) {
+      const res = await fetchImpl(`${apiUrl}${path}`, {
+        headers: { ...HEADERS, Authorization: `Bearer ${appJwt(appId, key)}` },
+      });
+      if (!res.ok) throw new Error(`GitHub GET ${path} failed: ${res.status}`);
+      return res.json();
+    },
+
+    // { title, fields: [{ name, dataType, options?: [names] }] }, or null.
+    async projectFields(projectId) {
+      const data = await graphql(PROJECT_FIELDS_QUERY, { id: projectId });
+      const node = data?.node;
+      if (!node?.fields) return null;
+      return {
+        title: node.title,
+        fields: node.fields.nodes
+          .filter((f) => f.name)
+          .map((f) => ({ name: f.name, dataType: f.dataType, options: f.options?.map((o) => o.name) })),
+      };
     },
 
     linkingEnabled: Boolean(clientId && clientSecret),

@@ -1,35 +1,50 @@
 # github-gigs
 
-A Discord bot that keeps a gig board (a Discord forum channel) in sync with a GitHub
-Project, and lets developers request gigs from Discord. It was built for
-[AniLounge](https://anilounge.net), but any project can use it: its board-specific
-settings live in a JSON config file (see [Configuration](#configuration)).
+A self-hosted Discord bot that turns a GitHub Project into a gig board. Issues on the
+Project show up as posts in Discord forum channels, and contributors claim them with
+slash commands. A maintainer approves each claim, and the result shows up on GitHub.
 
-- GitHub is the source of truth. The bot creates, updates, and deletes the forum posts,
-  so nobody edits them by hand.
-- It runs as its own Railway service and only talks to the GitHub and Discord APIs.
-  It needs no checkout of the project's repo.
-- It only touches forum posts it created. Hand-written posts, such as AniLounge's
-  Discord-only content tasks, are left alone.
+- **GitHub is the source of truth.** The bot creates, updates, and deletes forum posts to
+  match the Project, so nobody edits them by hand. Posts it didn't create are left alone.
+- **Claims flow both ways.** `/claim` in Discord assigns the issue and sets its Status on
+  GitHub. A claim with no commits for a while expires by itself.
+- **Several boards.** Gigs can be split across forums by type, for example Code, Content,
+  and Art.
+- **One copy per community.** Each copy serves one Discord server and one GitHub
+  Project. You run it yourself, for example on Railway, with your own GitHub App and
+  Discord application. ([Plans for a hosted public bot](docs/plans/public-bot.md).)
 
-## How sync works
+Built for [AniLounge](https://anilounge.net), whose setup is the worked example
+throughout these docs.
 
-Every webhook (`projects_v2_item` or `issues`) makes the bot re-read that Project item
-and bring its forum post in line:
+**To run your own copy, follow [docs/setup.md](docs/setup.md).**
+
+## How it works
+
+### Sync
+
+Every GitHub webhook (`projects_v2_item` or `issues`) makes the bot re-read that
+Project item and bring its forum post in line:
 
 - **Gets a post:** the issue is open, its Status is one of `postStatuses` (by default
-  Open, Claimed, In review), and it isn't in a private area.
+  Open, Claimed, In review), and it isn't in a private area such as `security`.
 - **Loses its post:** any other status (blank or Done), a closed issue, an archived
   item, or an item removed from the Project.
-- **Edits:** changes to the title, body, labels, or fields update the post in place.
-  If someone deleted the post by hand, the bot reposts it.
+- **Edits:** changes to the title, body, labels, fields, or assignees update the post
+  in place. If someone deleted the post by hand, the bot reposts it.
+
+Each post shows the issue's first paragraph, its **Requirements** bullet list, the
+Difficulty, the Bounty, and forum tags from the Area, Difficulty, and labels. Mentions
+in issue text never ping anyone.
+
+Postgres records which item owns which post. On every start, the bot runs a backfill
+that brings every board up to date, so it catches up after downtime by itself.
 
 ### Multiple boards
 
-Gigs can be split across several forum channels by type. Each entry in `boards`
-matches on the Project's **Type** field or on issue labels. The first match wins, and
-everything else goes to the default board (`DISCORD_GIG_CHANNEL_ID`, named by
-`defaultBoard`). AniLounge uses three forums: Content, Art, and Code (the default).
+Each entry in `boards` matches on the Project's **Type** field or on issue labels. The
+first match wins, and everything else goes to the default board
+(`DISCORD_GIG_CHANNEL_ID`). AniLounge's setup:
 
 ```json
 "boards": [
@@ -39,126 +54,89 @@ everything else goes to the default board (`DISCORD_GIG_CHANNEL_ID`, named by
 "defaultBoard": "Code"
 ```
 
-`channel` is a channel ID, or `$NAME` to read it from an environment variable. If a
-gig's Type changes, the bot deletes the old post and reposts it on the new board,
-because Discord can't move posts between forums. Replies on the old post are lost,
-but any claim is kept. `/claim` works on every board, and `/gigs` groups gigs by board.
-Each forum needs its own copies of the tags it uses.
+`channel` is a channel ID, or `$NAME` to read it from an environment variable. Discord
+can't move posts between forums, so when a gig's Type changes, the bot deletes the old
+post and reposts it on the new board. Any claim is kept.
 
-Postgres stores which item owns which post, so the bot can still delete the post after
-the item is gone from the Project. On every start, the bot runs a backfill that brings
-the whole board up to date, so it catches up after downtime by itself. `npm run backfill`
-does the same by hand.
+### Claiming
 
-## Claiming gigs
-
-Every command needs the Developer role (or Maintainer).
+Every command needs the Developer or Maintainer role.
 
 | Command | What it does |
 | --- | --- |
 | `/link` | Sends a "Sign in with GitHub" button, visible only to you. Signing in proves you own the account. The bot keeps only your login name. |
-| `/claim` | Run inside a gig post. It posts a public request with **Approve** and **Deny** buttons and pings the Maintainer role. Only maintainers can press them. |
-| `/unclaim` | Run inside a gig post. It withdraws your request or releases your claim. Maintainers can release anyone's claim. |
-| `/gigs` | Lists open, unclaimed gigs (visible only to you). |
+| `/claim` | Run in a gig post. It posts a request with **Approve** and **Deny** buttons and pings the Maintainer role. Only maintainers can press them. |
+| `/unclaim` | Withdraws your request or releases your claim. Maintainers can release anyone's claim. |
+| `/gigs` | Lists open gigs, grouped by board (visible only to you). |
 
-When a maintainer approves a request, the bot:
-- assigns the issue to the claimant,
+When a request is approved, the bot:
+- assigns the issue,
 - sets Status to Claimed,
 - comments on the issue,
-- and adds a 🔒 line and the Claimed tag to the post.
+- and marks the post with 🔒 and the Claimed tag.
 
 Releasing a claim reverses all four. GitHub won't assign outside contributors until
-they've commented on the issue. If assigning fails, the claim still counts, and both
-the bot's reply and its issue comment tell the claimant to comment.
+they've commented on the issue. If assigning fails, the claim still counts, and the bot
+tells the claimant to comment.
 
 Rules (all configurable):
-- **Limit:** each person can hold 2 claims or pending requests at a time.
-- **Expiry:** an hourly check releases a claim once 7 days pass after the claimant's
-  newest commit on an open PR linked to the issue. A PR is linked through "Fixes #N"
-  or the issue's Development sidebar. With no PR, the 7 days count from approval.
-  The bot pings the claimant in the post. Gigs In review never expire, since they're
-  waiting on a maintainer.
-- **Assigned on GitHub:** a gig assigned directly on GitHub shows as claimed by that
-  person, and `/claim` refuses it.
-
-Contributor-facing text for AniLounge lives in [docs/anilounge](docs/anilounge). It
-includes a CONTRIBUTING.md section and the gig board's pinned post and guidelines.
-Other projects can adapt it.
-
-## Routes
-
-| Route | What it does |
-| --- | --- |
-| `GET /health` | Liveness check for Railway. |
-| `POST /github/webhook` | Checks the HMAC SHA-256 signature, then syncs the forum from `projects_v2_item` and `issues` events. |
-| `POST /discord/interactions` | Checks the Ed25519 signature, then handles slash commands and buttons. |
-| `GET /github/oauth/callback` | Finishes `/link`. Its signed state expires after 10 minutes. |
+- **Limit:** each person can hold 2 claims or pending requests.
+- **Expiry:** an hourly check releases a claim 7 days after the claimant's newest commit
+  on an open PR linked to the issue, or 7 days after approval if there's no PR. The bot
+  pings the claimant. Gigs In review never expire, since they're waiting on a maintainer.
+- **Assigned on GitHub:** a gig assigned directly on GitHub shows as claimed, and
+  `/claim` refuses it.
 
 ## Configuration
 
-Set `GIGS_CONFIG` to a JSON file. Anything you leave out falls back to the generic
-defaults in [src/settings.js](src/settings.js). AniLounge's file is
+Settings that differ between communities live in JSON. Load it one of two ways:
+- `GIGS_CONFIG_JSON`: the JSON inline in an environment variable, so you can deploy this
+  repo without forking it.
+- `GIGS_CONFIG`: a path to a file in your fork.
+
+Start from [config/example.json](config/example.json). Anything you leave out falls
+back to the defaults in [src/settings.js](src/settings.js). AniLounge's file is
 [config/anilounge.json](config/anilounge.json).
 
 | Key | Meaning | Default |
 | --- | --- | --- |
 | `fields` | Names of the Project's Status, Difficulty, Bounty, Area, and Type fields | the same words |
 | `postStatuses` | Statuses that get a forum post | Open, Claimed, In review |
+| `statuses` | Status values the bot sets on claim and release | `open`: Open, `claimed`: Claimed |
 | `boards` | Extra forums, routed by Type or labels (see [Multiple boards](#multiple-boards)) | `[]` |
 | `defaultBoard` | Name of the default board, used by `/gigs` | `Gigs` |
 | `areaTags` | Project "Area" value or issue label → forum tag name | `{}` |
 | `labelTags` | Other issue labels → forum tag name | `enhancement`→Feature, `bug`→Bug Fix |
 | `privateAreas` | Areas and labels never posted publicly | `["security"]` |
 | `claimedTag` | Forum tag for claimed gigs | `Claimed` |
-| `statuses` | Status values the bot sets on claim and release | `open`: Open, `claimed`: Claimed |
 | `claims.requireApproval` | `/claim` needs a maintainer to approve it (`false` = first come, first served) | `true` |
 | `claims.maxActivePerUser` | Claims plus pending requests allowed per person | `2` |
-| `claims.expireDaysAfterLastCommit` | A claim lapses this many days after the claimant's last commit on the linked PR (or after approval if there is no PR). `0` means never. | `7` |
+| `claims.expireDaysAfterLastCommit` | Days without commits before a claim lapses. `0` means never. | `7` |
 
-Forum tags are matched by name, ignoring case, so create them in Discord first.
-Difficulty tags use the Project's Difficulty value (for example `Easy`).
+Environment variables (IDs, secrets, URLs) are listed in [.env.example](.env.example).
+In production they live only in your host's variable settings.
 
-## Setup
+## Scripts
 
-For a full step-by-step walkthrough, see [docs/anilounge/setup.md](docs/anilounge/setup.md).
-The steps below are the summary.
+| Command | What it does |
+| --- | --- |
+| `npm start` | Runs the bot. It creates or upgrades its tables and backfills on start. |
+| `npm run check-config` | Read-only check of your settings against the live GitHub and Discord. |
+| `npm run register-commands` | Registers the slash commands. Set `DISCORD_GUILD_ID` to make them appear instantly. |
+| `npm run backfill` | Resyncs every board by hand. It needs access to the database. |
+| `npm test` | Runs the unit tests. |
+| `npm run test:e2e` | Runs end-to-end tests against a real Postgres (see below). |
 
-1. **GitHub org.** Your repo and Project must belong to an organization, because
-   GitHub only sends `projects_v2_item` webhooks for org-owned Projects. Create the
-   gig Project there (AniLounge's is **AniLounge Gigs**). For multiple boards, add a
-   single-select **Type** field (AniLounge: Code, Content, Art).
-2. **GitHub App** (for example `anilounge-bot`) on the org.
-   - Repository permissions: Issues read/write, Metadata read.
-   - Organization permissions: Projects read/write.
-   - Events: Projects v2 item, Issues.
-   - Webhook URL: `https://<railway-domain>/github/webhook`, with a random secret.
-   - Callback URL (for `/link`): `https://<railway-domain>/github/oauth/callback`.
-     Copy the App's Client ID and generate a client secret.
-   - Generate a private key. Install the App on the org, and note the installation
-     id at the end of the installation's settings URL.
-   - Get the Project's node id (`PVT_...`). The `gh` command needs the
-     `read:project` scope (`gh auth refresh -s read:project`):
-     `gh project view <number> --owner <org> --format json --jq .id`
-3. **Discord application.**
-   - Set the Interactions Endpoint URL to `https://<railway-domain>/discord/interactions`.
-   - Invite the bot with the `bot` and `applications.commands` scopes.
-   - On each gig forum, give it View Channel, Create Posts, Send Messages in Posts,
-     Manage Threads, and Manage Messages.
-   - Find the forum's channel ID: it is the last number in
-     `discord.com/channels/<guild>/<channel>`.
-   - Create one forum channel per board (AniLounge: Code, Content, Art), each with
-     the tags it uses (for example Frontend, Backend, Mobile,
-     Feature, Bug Fix, Easy, Medium, Hard, Claimed). Give the bot the permissions
-     above on every one.
-   - Create Developer and Maintainer roles. Copy their IDs: turn on Developer Mode,
-     then right-click each role.
-4. **Railway.** Add a Postgres database. The tables are created on startup. Set the
-   variables listed in `.env.example`; secrets live only there. `PUBLIC_URL` is the
-   service's Railway domain. Deploy, then run:
-   - `railway run npm run register-commands`. Set `DISCORD_GUILD_ID` first if you
-     want the commands to appear instantly in one server. It runs on your machine
-     with Railway's variables and doesn't need the database.
-   - The bot fills the boards by itself on start-up.
+On Railway, prefix a command with `railway run` to use the service's variables.
+
+## Routes
+
+| Route | What it does |
+| --- | --- |
+| `GET /health` | Liveness check. |
+| `POST /github/webhook` | Checks the HMAC SHA-256 signature, then syncs from `projects_v2_item` and `issues` events. |
+| `POST /discord/interactions` | Checks the Ed25519 signature, then handles slash commands and buttons. |
+| `GET /github/oauth/callback` | Finishes `/link`. Its signed state expires after 10 minutes. |
 
 ## Development
 
@@ -167,14 +145,17 @@ npm install
 npm test
 ```
 
-`npm run test:e2e` runs the real server, backfill, and claim flows against a real
-Postgres, with stand-in GitHub and Discord APIs on localhost:
+`npm run test:e2e` runs the real server, backfill, claims, and board routing against a
+real Postgres, with stand-in GitHub and Discord APIs on localhost:
 
 ```bash
 docker run -d --rm --name gigs-pg -e POSTGRES_PASSWORD=pg -p 127.0.0.1:55432:5432 postgres:16
 DATABASE_URL=postgres://postgres:pg@127.0.0.1:55432/postgres npm run test:e2e
 ```
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute changes.
+
 ## License
 
-AGPL-3.0. If you run a modified version as a public service, you must share your changes.
+AGPL-3.0. You can run, change, and share it. If you run a modified copy, you must offer
+its source code to the people who use it.

@@ -13,6 +13,7 @@
     "start": "node src/server.js",
     "backfill": "node scripts/backfill.js",
     "register-commands": "node scripts/register-commands.js",
+    "check-config": "node scripts/check-config.js",
     "test": "node --test test/*.test.js",
     "test:e2e": "node test/e2e.local.js"
   },

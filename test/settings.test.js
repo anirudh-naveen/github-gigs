@@ -17,5 +17,6 @@ test('a config file overrides defaults deeply', () => {
 test('the AniLounge config matches the agreed rules', () => {
   const s = loadSettings('config/anilounge.json');
   assert.deepEqual(s.claims, { requireApproval: true, maxActivePerUser: 2, expireDaysAfterLastCommit: 7 });
-  assert.equal(s.areaTags.content, 'Content Update');
+  assert.equal(s.areaTags.content, undefined); // Content is a board (Type), not an Area
+  assert.deepEqual(s.boards.map((b) => b.name), ['Content', 'Art']);
 });

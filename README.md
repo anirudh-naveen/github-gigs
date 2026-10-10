@@ -144,7 +144,7 @@ Difficulty tags use the Project's Difficulty value (for example `Easy`).
    - Find the forum's channel ID: it is the last number in
      `discord.com/channels/<guild>/<channel>`.
    - Create one forum channel per board (AniLounge: Code, Content, Art), each with
-     the tags it uses (for example Frontend, Backend, Content Update, Mobile,
+     the tags it uses (for example Frontend, Backend, Mobile,
      Feature, Bug Fix, Easy, Medium, Hard, Claimed). Give the bot the permissions
      above on every one.
    - Create Developer and Maintainer roles. Copy their IDs: turn on Developer Mode,

@@ -1,12 +1,26 @@
 # Discord gig board text
 
-Two pieces of text for each gig forum (Code, Content, and Art). Use the same text in
-all three. Before posting, replace CONTRIBUTING_URL and BOUNTY_TERMS.
+Text for the three gig forums: Code, Content, and Art. Code and Art hold only bot posts.
+Content holds bot posts and tasks maintainers write by hand. The bot never touches posts
+it didn't create, so the two kinds can share a forum. Before posting, replace
+CONTRIBUTING_URL and BOUNTY_TERMS.
+
+## 0. Permissions (all three forums)
+
+So that only maintainers and the bot open posts:
+
+- **@everyone:** turn off **Create Posts**. Leave **Send Messages in Posts** on, so
+  people can reply.
+- **Maintainer role:** turn on **Create Posts**, so you can write content tasks and the
+  pinned intro.
+- **Bot:** the permissions from the README setup steps.
 
 ## 1. Post Guidelines
 
 To set them: Edit Channel → Overview → Post Guidelines. Discord shows them at the top
 of the forum and in the "new post" form.
+
+**Code and Art**
 
 ```
 Every gig here is created and updated by the bot from GitHub, so please don't open posts here yourself.
@@ -14,11 +28,20 @@ To claim a gig: get the Developer role, run /link once, then run /claim inside a
 Questions about a gig? Reply in its post.
 ```
 
+**Content**
+
+```
+Two kinds of posts live here:
+• Gigs from GitHub, which have Difficulty, Bounty and Requirements lines. The bot keeps them up to date. To claim one: get the Developer role, run /link once, then run /claim inside the post. A maintainer approves each claim.
+• Content tasks written by maintainers. To take one, reply in its post.
+Questions? Reply in the post.
+```
+
 ## 2. Pinned intro post
 
-Post it as a maintainer, then right-click the post → **Pin Post**. The bot ignores posts
-it didn't create, so this one stays. Paste the title and body as they are. The body is
-under Discord's 2000-character limit.
+Post it as a maintainer in each forum, then right-click the post → **Pin Post**. Use the
+same title and body everywhere. In the Content forum, add the extra section where the
+body marks it. Both versions are under Discord's 2000-character limit.
 
 **Title**
 
@@ -55,4 +78,12 @@ BOUNTY_TERMS
 **Getting started**
 Read the contributing guide first: CONTRIBUTING_URL
 Ask questions in the gig's post. Report security problems by email to support@anilounge.net, never here.
+```
+
+**Extra section for the Content forum.** Paste it into the body just before **Reading a gig**:
+
+```
+**Two kinds of posts here**
+Gigs from GitHub have Difficulty, Bounty and Requirements lines, and you claim them with `/claim`. The other posts are content tasks written by a maintainer. To take one, reply in the post, and the maintainer will confirm. Content tasks don't count toward the 2-claim limit and don't appear in `/gigs`.
+
 ```

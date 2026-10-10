@@ -52,4 +52,7 @@ Some rules keep gigs moving:
 Some gigs show a **bounty**. BOUNTY_TERMS (for example: "Bounties are paid after the pull
 request is merged. Ask a maintainer in the gig's post if you have questions.")
 
+The Content forum also has smaller content tasks that maintainers write by hand. They
+aren't on GitHub, so `/claim` doesn't work there. Reply in the post to take one.
+
 Security problems are never gigs. See [Security issues](#security-issues).

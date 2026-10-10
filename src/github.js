@@ -1,6 +1,7 @@
 import { sign } from 'node:crypto';
 
 const API = 'https://api.github.com';
+const WEB = 'https://github.com';
 const HEADERS = {
   Accept: 'application/vnd.github+json',
   'User-Agent': 'github-gigs',
@@ -40,6 +41,7 @@ query($id: ID!, $status: String!, $difficulty: String!, $bounty: String!, $area:
           id number title body url state
           repository { nameWithOwner }
           labels(first: 50) { nodes { name } }
+          assignees(first: 10) { nodes { login } }
         }
       }
       status: fieldValueByName(name: $status) { ${VALUE} }
@@ -69,6 +71,40 @@ query($id: ID!, $after: String) {
   }
 }`;
 
+const STATUS_FIELD_QUERY = `
+query($id: ID!, $name: String!) {
+  node(id: $id) {
+    ... on ProjectV2 {
+      field(name: $name) {
+        ... on ProjectV2SingleSelectField { id options { id name } }
+      }
+    }
+  }
+}`;
+
+const SET_FIELD_MUTATION = `
+mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+  updateProjectV2ItemFieldValue(input: {
+    projectId: $project, itemId: $item, fieldId: $field,
+    value: { singleSelectOptionId: $option }
+  }) { projectV2Item { id } }
+}`;
+
+// Open PRs that will close the issue, with their newest commit.
+const LINKED_PRS_QUERY = `
+query($id: ID!) {
+  node(id: $id) {
+    ... on Issue {
+      closedByPullRequestsReferences(first: 10, includeClosedPrs: false) {
+        nodes {
+          author { login }
+          commits(last: 1) { nodes { commit { committedDate } } }
+        }
+      }
+    }
+  }
+}`;
+
 function fieldText(value) {
   if (!value) return '';
   if (value.name != null) return value.name;
@@ -77,13 +113,16 @@ function fieldText(value) {
   return '';
 }
 
-export function createGitHubClient({ appId, privateKey, installationId }, fetchImpl = fetch) {
+export function createGitHubClient(
+  { appId, privateKey, installationId, clientId, clientSecret, apiUrl = API, webUrl = WEB },
+  fetchImpl = fetch,
+) {
   const key = normalizePrivateKey(privateKey);
   let cached = null;
 
   async function installationToken() {
     if (cached && cached.expiresAt - Date.now() > 5 * 60 * 1000) return cached.token;
-    const res = await fetchImpl(`${API}/app/installations/${installationId}/access_tokens`, {
+    const res = await fetchImpl(`${apiUrl}/app/installations/${installationId}/access_tokens`, {
       method: 'POST',
       headers: { ...HEADERS, Authorization: `Bearer ${appJwt(appId, key)}` },
     });
@@ -94,7 +133,7 @@ export function createGitHubClient({ appId, privateKey, installationId }, fetchI
   }
 
   async function graphql(query, variables) {
-    const res = await fetchImpl(`${API}/graphql`, {
+    const res = await fetchImpl(`${apiUrl}/graphql`, {
       method: 'POST',
       headers: { ...HEADERS, Authorization: `Bearer ${await installationToken()}` },
       body: JSON.stringify({ query, variables }),
@@ -105,6 +144,28 @@ export function createGitHubClient({ appId, privateKey, installationId }, fetchI
     const errors = (json.errors || []).filter((e) => e.type !== 'NOT_FOUND');
     if (errors.length) throw new Error(`GitHub GraphQL error: ${errors.map((e) => e.message).join('; ')}`);
     return json.data;
+  }
+
+  async function rest(method, path, body) {
+    const res = await fetchImpl(`${apiUrl}${path}`, {
+      method,
+      headers: { ...HEADERS, Authorization: `Bearer ${await installationToken()}` },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`GitHub ${method} ${path} failed: ${res.status}`);
+    return res.status === 204 ? null : res.json();
+  }
+
+  const statusFields = new Map();
+  async function statusField(projectId, name) {
+    const key = `${projectId}/${name}`;
+    if (!statusFields.has(key)) {
+      const data = await graphql(STATUS_FIELD_QUERY, { id: projectId, name });
+      const field = data?.node?.field;
+      if (!field?.options) throw new Error(`Project has no single-select field named "${name}"`);
+      statusFields.set(key, field);
+    }
+    return statusFields.get(key);
   }
 
   return {
@@ -130,6 +191,7 @@ export function createGitHubClient({ appId, privateKey, installationId }, fetchI
             url: c.url,
             state: c.state,
             labels: c.labels.nodes.map((l) => l.name),
+            assignees: c.assignees.nodes.map((a) => a.login),
           }
           : null,
         fields: {
@@ -159,6 +221,64 @@ export function createGitHubClient({ appId, privateKey, installationId }, fetchI
         after = items.pageInfo.hasNextPage ? items.pageInfo.endCursor : null;
       } while (after);
       return ids;
+    },
+
+    // GitHub silently skips people it won't let you assign (outside
+    // contributors who haven't commented on the issue), so report what stuck.
+    async assign(repo, number, login) {
+      const issue = await rest('POST', `/repos/${repo}/issues/${number}/assignees`, { assignees: [login] });
+      return (issue.assignees || []).some((a) => a.login.toLowerCase() === login.toLowerCase());
+    },
+
+    async unassign(repo, number, login) {
+      await rest('DELETE', `/repos/${repo}/issues/${number}/assignees`, { assignees: [login] });
+    },
+
+    async comment(repo, number, body) {
+      await rest('POST', `/repos/${repo}/issues/${number}/comments`, { body });
+    },
+
+    // Sets a single-select field (e.g. Status) by option name.
+    async setField(projectId, itemId, fieldName, optionName) {
+      const field = await statusField(projectId, fieldName);
+      const option = field.options.find((o) => o.name.toLowerCase() === optionName.toLowerCase());
+      if (!option) throw new Error(`Field "${fieldName}" has no option "${optionName}"`);
+      await graphql(SET_FIELD_MUTATION, { project: projectId, item: itemId, field: field.id, option: option.id });
+    },
+
+    // Newest commit date on the claimant's open PRs linked to the issue, or null.
+    async lastCommitAt(issueId, login) {
+      const data = await graphql(LINKED_PRS_QUERY, { id: issueId });
+      const prs = data?.node?.closedByPullRequestsReferences?.nodes || [];
+      const dates = prs
+        .filter((pr) => pr.author?.login?.toLowerCase() === login.toLowerCase())
+        .map((pr) => pr.commits.nodes[0]?.commit.committedDate)
+        .filter(Boolean)
+        .map((d) => new Date(d));
+      return dates.length ? new Date(Math.max(...dates)) : null;
+    },
+
+    linkingEnabled: Boolean(clientId && clientSecret),
+
+    authorizeUrl(state, redirectUri) {
+      const params = new URLSearchParams({ client_id: clientId, state, redirect_uri: redirectUri });
+      return `${webUrl}/login/oauth/authorize?${params}`;
+    },
+
+    // Trades an OAuth code for the user's login. The user token is not kept.
+    async loginFromCode(code) {
+      const res = await fetchImpl(`${webUrl}/login/oauth/access_token`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'github-gigs' },
+        body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.access_token) throw new Error('GitHub did not accept the sign-in code');
+      const user = await fetchImpl(`${apiUrl}/user`, {
+        headers: { ...HEADERS, Authorization: `Bearer ${json.access_token}` },
+      });
+      if (!user.ok) throw new Error(`GitHub user lookup failed: ${user.status}`);
+      return (await user.json()).login;
     },
   };
 }

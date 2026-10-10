@@ -68,6 +68,7 @@ test('github: getItem flattens the item and reuses the installation token', asyn
     content: {
       __typename: 'Issue', id: 'I_1', number: 78, title: 'T', body: 'B', url: 'u', state: 'OPEN',
       repository: { nameWithOwner: 'o/r' }, labels: { nodes: [{ name: 'backend' }] },
+      assignees: { nodes: [{ login: 'octo' }] },
     },
     status: { name: 'Open' }, difficulty: { name: 'Easy' }, bounty: { text: '$5' }, area: null,
   };
@@ -80,7 +81,7 @@ test('github: getItem flattens the item and reuses the installation token', asyn
   const fields = { status: 'Status', difficulty: 'Difficulty', bounty: 'Bounty', area: 'Area' };
   assert.deepEqual(await gh.getItem('PVTI_1', fields), {
     id: 'PVTI_1', projectId: 'PVT_1', isArchived: false,
-    issue: { id: 'I_1', repo: 'o/r', number: 78, title: 'T', body: 'B', url: 'u', state: 'OPEN', labels: ['backend'] },
+    issue: { id: 'I_1', repo: 'o/r', number: 78, title: 'T', body: 'B', url: 'u', state: 'OPEN', labels: ['backend'], assignees: ['octo'] },
     fields: { status: 'Open', difficulty: 'Easy', bounty: '$5', area: '' },
   });
   assert.equal(await gh.getItem('PVTI_gone', fields), null);

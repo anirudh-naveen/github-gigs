@@ -29,23 +29,45 @@ the item is gone from the Project. `npm run backfill` (`railway run npm run back
 on Railway) brings the whole board up to date. Run it once after setup, or any time
 the bot was down.
 
-## Status
+## Claiming gigs
 
-Phases 3 and 4 (skeleton and Project → Discord sync) are done:
+Every command needs the Developer role (or Maintainer).
+
+| Command | What it does |
+| --- | --- |
+| `/link` | Sends a "Sign in with GitHub" button, visible only to you. Signing in proves you own the account. The bot keeps only your login name. |
+| `/claim` | Run inside a gig post. It posts a public request with **Approve** and **Deny** buttons and pings the Maintainer role. Only maintainers can press them. |
+| `/unclaim` | Run inside a gig post. It withdraws your request or releases your claim. Maintainers can release anyone's claim. |
+| `/gigs` | Lists open, unclaimed gigs (visible only to you). |
+
+When a maintainer approves a request, the bot:
+- assigns the issue to the claimant,
+- sets Status to Claimed,
+- comments on the issue,
+- and adds a 🔒 line and the Claimed tag to the post.
+
+Releasing a claim reverses all four. GitHub won't assign outside contributors until
+they've commented on the issue. If assigning fails, the claim still counts, and both
+the bot's reply and its issue comment tell the claimant to comment.
+
+Rules (all configurable):
+- **Limit:** each person can hold 2 claims or pending requests at a time.
+- **Expiry:** an hourly check releases a claim once 7 days pass after the claimant's
+  newest commit on an open PR linked to the issue. A PR is linked through "Fixes #N"
+  or the issue's Development sidebar. With no PR, the 7 days count from approval.
+  The bot pings the claimant in the post. Gigs In review never expire, since they're
+  waiting on a maintainer.
+- **Assigned on GitHub:** a gig assigned directly on GitHub shows as claimed by that
+  person, and `/claim` refuses it.
+
+## Routes
 
 | Route | What it does |
 | --- | --- |
 | `GET /health` | Liveness check for Railway. |
 | `POST /github/webhook` | Checks the HMAC SHA-256 signature, then syncs the forum from `projects_v2_item` and `issues` events. |
-| `POST /discord/interactions` | Checks the Ed25519 signature, answers PING, and runs slash commands for Developer or Maintainer roles. Commands come in phase 5. |
-
-`src/gig.js` builds forum posts in the gig format (Description / Difficulty /
-Bounty / Requirements). It enforces Discord's limits (100-char title, 2000-char
-message, 5 tags), never allows mentions, and never mirrors security gigs.
-
-Still to do:
-- **Phase 5:** `/link`, `/claim`, `/unclaim`, `/gigs`, and claim limits and expiry
-  from the config.
+| `POST /discord/interactions` | Checks the Ed25519 signature, then handles slash commands and buttons. |
+| `GET /github/oauth/callback` | Finishes `/link`. Its signed state expires after 10 minutes. |
 
 ## Configuration
 
@@ -61,8 +83,9 @@ defaults in [src/settings.js](src/settings.js). AniLounge's file is
 | `labelTags` | Other issue labels → forum tag name | `enhancement`→Feature, `bug`→Bug Fix |
 | `privateAreas` | Areas and labels never posted publicly | `["security"]` |
 | `claimedTag` | Forum tag for claimed gigs | `Claimed` |
-| `claims.requireApproval` | `/claim` needs a maintainer to approve it | `true` |
-| `claims.maxActivePerUser` | Active claims allowed per person | `2` |
+| `statuses` | Status values the bot sets on claim and release | `open`: Open, `claimed`: Claimed |
+| `claims.requireApproval` | `/claim` needs a maintainer to approve it (`false` = first come, first served) | `true` |
+| `claims.maxActivePerUser` | Claims plus pending requests allowed per person | `2` |
 | `claims.expireDaysAfterLastCommit` | A claim lapses this many days after the claimant's last commit on the linked PR (or after approval if there is no PR). `0` means never. | `7` |
 
 Forum tags are matched by name, ignoring case, so create them in Discord first.
@@ -78,6 +101,8 @@ Difficulty tags use the Project's Difficulty value (for example `Easy`).
    - Organization permissions: Projects read/write.
    - Events: Projects v2 item, Issues.
    - Webhook URL: `https://<railway-domain>/github/webhook`, with a random secret.
+   - Callback URL (for `/link`): `https://<railway-domain>/github/oauth/callback`.
+     Copy the App's Client ID and generate a client secret.
    - Generate a private key. Install the App on the org, and note the installation
      id at the end of the installation's settings URL.
    - Get the Project's node id (`PVT_...`). The `gh` command needs the
@@ -90,15 +115,30 @@ Difficulty tags use the Project's Difficulty value (for example `Easy`).
      Threads, and Manage Messages.
    - Find the forum's channel ID: it is the last number in
      `discord.com/channels/<guild>/<channel>`.
-4. **Railway.** Add a Postgres database. The table is created on startup. Set the
-   variables listed in `.env.example`; secrets live only there. Deploy, then run
-   `railway run npm run backfill`.
+   - Create the forum tags you use (for AniLounge: Frontend, Backend, Content Update,
+     Mobile, Feature, Bug Fix, Easy, Medium, Hard, Claimed).
+   - Create Developer and Maintainer roles. Copy their IDs: turn on Developer Mode,
+     then right-click each role.
+4. **Railway.** Add a Postgres database. The tables are created on startup. Set the
+   variables listed in `.env.example`; secrets live only there. `PUBLIC_URL` is the
+   service's Railway domain. Deploy, then run:
+   - `railway run npm run register-commands`. Set `DISCORD_GUILD_ID` first if you
+     want the commands to appear instantly in one server.
+   - `railway run npm run backfill`
 
 ## Development
 
 ```bash
 npm install
 npm test
+```
+
+`npm run test:e2e` runs the real server, backfill, and claim flows against a real
+Postgres, with stand-in GitHub and Discord APIs on localhost:
+
+```bash
+docker run -d --rm --name gigs-pg -e POSTGRES_PASSWORD=pg -p 127.0.0.1:55432:5432 postgres:16
+DATABASE_URL=postgres://postgres:pg@127.0.0.1:55432/postgres npm run test:e2e
 ```
 
 ## License

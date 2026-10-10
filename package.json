@@ -12,7 +12,9 @@
   "scripts": {
     "start": "node src/server.js",
     "backfill": "node scripts/backfill.js",
-    "test": "node --test test/*.test.js"
+    "register-commands": "node scripts/register-commands.js",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "node test/e2e.local.js"
   },
   "dependencies": {
     "express": "^4.21.2",

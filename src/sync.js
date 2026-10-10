@@ -1,7 +1,7 @@
 import { isGone } from './discord.js';
 import { gigPost, gigUpdate, shouldMirror } from './gig.js';
 
-const ISSUE_ACTIONS = new Set(['edited', 'closed', 'reopened', 'labeled', 'unlabeled']);
+const ISSUE_ACTIONS = new Set(['edited', 'closed', 'reopened', 'labeled', 'unlabeled', 'assigned', 'unassigned']);
 const TAG_CACHE_MS = 5 * 60 * 1000;
 
 // Keeps the forum in step with the Project. Every change funnels into
@@ -28,7 +28,15 @@ export function createSync({ github, discord, store, settings, channelId, projec
 
   const postStatuses = new Set(settings.postStatuses.map((s) => s.toLowerCase()));
 
-  function toGig(item) {
+  // A claim made through the bot names the Discord user; otherwise an
+  // assignee set on GitHub counts as the claimant.
+  function claimOf(item, row) {
+    if (row?.claim) return row.claim;
+    const login = item.issue.assignees?.[0];
+    return login ? { discordId: null, githubLogin: login } : null;
+  }
+
+  function toGig(item, row) {
     const { issue } = item;
     return {
       number: issue.number,
@@ -37,15 +45,15 @@ export function createSync({ github, discord, store, settings, channelId, projec
       url: issue.url,
       labels: issue.labels,
       fields: item.fields,
-      claim: null, // phase 5
+      claim: claimOf(item, row),
     };
   }
 
-  function wanted(item) {
+  function wanted(item, row) {
     if (!item || item.projectId !== projectId || item.isArchived || !item.issue) return null;
     if (item.issue.state !== 'OPEN') return null;
     if (!postStatuses.has(item.fields.status.toLowerCase())) return null;
-    const gig = toGig(item);
+    const gig = toGig(item, row);
     return shouldMirror(gig, settings) ? gig : null;
   }
 
@@ -53,7 +61,7 @@ export function createSync({ github, discord, store, settings, channelId, projec
     return withLock(itemId, async () => {
       const row = await store.get(itemId);
       const item = await github.getItem(itemId, settings.fields);
-      const gig = wanted(item);
+      const gig = wanted(item, row);
 
       if (gig) {
         const tags = await forumTags();

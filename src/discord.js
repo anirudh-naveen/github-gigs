@@ -14,10 +14,10 @@ export function isGone(err) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export function createDiscordClient({ botToken }, fetchImpl = fetch, wait = sleep) {
+export function createDiscordClient({ botToken, apiUrl = API }, fetchImpl = fetch, wait = sleep) {
   async function request(method, path, body) {
     for (let attempt = 0; attempt < 4; attempt++) {
-      const res = await fetchImpl(`${API}${path}`, {
+      const res = await fetchImpl(`${apiUrl}${path}`, {
         method,
         headers: {
           Authorization: `Bot ${botToken}`,
@@ -58,6 +58,15 @@ export function createDiscordClient({ botToken }, fetchImpl = fetch, wait = slee
     async updatePost(threadId, update) {
       await request('PATCH', `/channels/${threadId}`, { ...update.thread, archived: false });
       await request('PATCH', `/channels/${threadId}/messages/${threadId}`, update.message);
+    },
+
+    async sendMessage(channelId, message) {
+      return request('POST', `/channels/${channelId}/messages`, message);
+    },
+
+    // Edits the reply to a deferred interaction.
+    async editOriginal(applicationId, token, message) {
+      return request('PATCH', `/webhooks/${applicationId}/${token}/messages/@original`, message);
     },
 
     async deletePost(threadId) {

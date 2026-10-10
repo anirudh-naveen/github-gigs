@@ -12,6 +12,7 @@ const env = {
   DISCORD_BOT_TOKEN: 'token',
   DISCORD_GIG_CHANNEL_ID: 'chan',
   DISCORD_DEVELOPER_ROLE_ID: 'dev',
+  DISCORD_MAINTAINER_ROLE_ID: 'maint',
   GITHUB_WEBHOOK_SECRET: 'hook',
   GITHUB_APP_ID: '1',
   GITHUB_APP_PRIVATE_KEY: 'key',
@@ -95,7 +96,7 @@ test('discord: bad signatures are rejected', () => withServer({}, async (base) =
 }));
 
 test('discord: commands require the Developer role', () => withServer({
-  onCommand: async () => ephemeral('ran'),
+  onInteraction: async () => ({ response: ephemeral('ran') }),
 }, async (base) => {
   const without = await discordPost(base, { type: 2, data: { name: 'gigs' }, member: { roles: [] } });
   assert.match((await without.json()).data.content, /Developer role/);

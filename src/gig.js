@@ -5,7 +5,7 @@
 //   number, title, body, url,
 //   labels: ['frontend', 'difficulty: medium', ...],
 //   fields: { status, difficulty, bounty, area },   // from the Project
-//   claim: { discordId, githubLogin } | null,
+//   claim: { discordId, githubLogin } | null,   // discordId null: claimed on GitHub
 // }
 
 import { DEFAULTS } from './settings.js';
@@ -109,8 +109,10 @@ export function gigContent(gig, settings = DEFAULTS) {
     `**Difficulty**: ${difficulty(gig) || '—'}`,
     `**Bounty**: ${bounty(gig) || '—'}`,
   ];
-  if (gig.claim) {
+  if (gig.claim?.discordId) {
     head.push(`🔒 Claimed by <@${gig.claim.discordId}> (GitHub: ${gig.claim.githubLogin})`);
+  } else if (gig.claim) {
+    head.push(`🔒 Claimed by ${gig.claim.githubLogin} on GitHub`);
   }
 
   const middle = [];

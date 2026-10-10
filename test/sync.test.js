@@ -166,7 +166,7 @@ test('issue events reconcile that issue\'s items on this Project only', async ()
   items.set('theirs', item('theirs', { top: { projectId: 'PVT_other' } }));
   await sync.handleEvent('issues', { action: 'edited', issue: { node_id: 'I_mine' } });
   await sync.handleEvent('issues', { action: 'edited', issue: { node_id: 'I_theirs' } });
-  await sync.handleEvent('issues', { action: 'assigned', issue: { node_id: 'I_mine' } });
+  await sync.handleEvent('issues', { action: 'milestoned', issue: { node_id: 'I_mine' } });
   assert.equal(calls.length, 1);
 });
 

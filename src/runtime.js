@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { createClaims } from './claims.js';
 import { createDiscordClient } from './discord.js';
 import { createGitHubClient } from './github.js';
 import { createPgStore } from './store.js';
@@ -9,14 +10,17 @@ export async function createRuntime(config, log = console.log) {
   const pool = new pg.Pool({ connectionString: config.databaseUrl });
   const store = createPgStore(pool);
   await store.init();
+  const github = createGitHubClient(config.github);
+  const discord = createDiscordClient(config.discord);
   const sync = createSync({
-    github: createGitHubClient(config.github),
-    discord: createDiscordClient(config.discord),
+    github,
+    discord,
     store,
     settings: config.board,
     channelId: config.discord.gigChannelId,
     projectId: config.github.projectId,
     log,
   });
-  return { sync, close: () => pool.end() };
+  const claims = createClaims({ github, discord, store, sync, settings: config.board, config, log });
+  return { sync, claims, discord, close: () => pool.end() };
 }

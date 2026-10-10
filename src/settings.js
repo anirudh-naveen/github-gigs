@@ -9,6 +9,8 @@ export const DEFAULTS = {
   // Statuses that get a forum post. Any other status (including blank, Done)
   // removes it, as do closing the issue and removing it from the Project.
   postStatuses: ['Open', 'Claimed', 'In review'],
+  // Status values the bot sets when a gig is claimed or released.
+  statuses: { open: 'Open', claimed: 'Claimed' },
   // Project "Area" value or issue label -> forum tag name.
   areaTags: {},
   // Other issue labels -> forum tag name.

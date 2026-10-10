@@ -1,13 +1,19 @@
+import { createRouter } from './boards.js';
 import { isGone } from './discord.js';
 import { gigPost, gigUpdate, shouldMirror } from './gig.js';
 
 const ISSUE_ACTIONS = new Set(['edited', 'closed', 'reopened', 'labeled', 'unlabeled', 'assigned', 'unassigned']);
 const TAG_CACHE_MS = 5 * 60 * 1000;
 
-// Keeps the forum in step with the Project. Every change funnels into
+// Keeps the forums in step with the Project. Every change funnels into
 // reconcile(itemId), which reads the item fresh and makes the post match, so
 // events can arrive out of order or twice without harm.
-export function createSync({ github, discord, store, settings, channelId, projectId, log = console.log }) {
+//
+// boards: resolved boards (see boards.js). Without them, every gig goes to
+// channelId.
+export function createSync({ github, discord, store, settings, channelId, boards, projectId, log = console.log }) {
+  const router = createRouter(boards || [{ name: settings.defaultBoard, channelId, types: new Set(), labels: new Set() }]);
+
   // One reconcile per item at a time, so two quick events can't both create a post.
   const locks = new Map();
   function withLock(key, fn) {
@@ -18,12 +24,14 @@ export function createSync({ github, discord, store, settings, channelId, projec
     return run;
   }
 
-  let tagCache = { at: 0, tags: [] };
-  async function forumTags() {
-    if (Date.now() - tagCache.at > TAG_CACHE_MS) {
-      tagCache = { at: Date.now(), tags: await discord.getForumTags(channelId) };
-    }
-    return tagCache.tags;
+  // Each forum has its own tags.
+  const tagCache = new Map();
+  async function forumTags(forumId) {
+    const cached = tagCache.get(forumId);
+    if (cached && Date.now() - cached.at <= TAG_CACHE_MS) return cached.tags;
+    const tags = await discord.getForumTags(forumId);
+    tagCache.set(forumId, { at: Date.now(), tags });
+    return tags;
   }
 
   const postStatuses = new Set(settings.postStatuses.map((s) => s.toLowerCase()));
@@ -64,13 +72,25 @@ export function createSync({ github, discord, store, settings, channelId, projec
       const gig = wanted(item, row);
 
       if (gig) {
-        const tags = await forumTags();
+        const forumId = router.channelFor(item);
+        const tags = await forumTags(forumId);
         const record = {
           itemId,
           repo: item.issue.repo,
           number: item.issue.number,
+          channelId: forumId,
           status: item.fields.status,
         };
+        // Posts can't move between forums, so a gig whose board changed is
+        // deleted and posted fresh on the new one. Rows from before boards
+        // existed have no channel and live on the default board.
+        const current = row?.channelId || router.defaultChannelId;
+        if (row?.threadId && current !== forumId) {
+          await discord.deletePost(row.threadId);
+          const threadId = await discord.createPost(forumId, gigPost(gig, tags, settings));
+          await store.save({ ...record, threadId });
+          return 'moved';
+        }
         if (row?.threadId) {
           try {
             await discord.updatePost(row.threadId, gigUpdate(gig, tags, settings));
@@ -81,7 +101,7 @@ export function createSync({ github, discord, store, settings, channelId, projec
             log(`thread ${row.threadId} for ${record.repo}#${record.number} was gone; reposting`);
           }
         }
-        const threadId = await discord.createPost(channelId, gigPost(gig, tags, settings));
+        const threadId = await discord.createPost(forumId, gigPost(gig, tags, settings));
         await store.save({ ...record, threadId });
         return 'created';
       }
@@ -101,6 +121,8 @@ export function createSync({ github, discord, store, settings, channelId, projec
 
   return {
     reconcile,
+    boardName: (forumId) => router.nameOf(forumId || router.defaultChannelId),
+    boards: router.boards,
 
     async handleEvent(event, payload) {
       if (event === 'projects_v2_item') {
@@ -116,7 +138,7 @@ export function createSync({ github, discord, store, settings, channelId, projec
     // Brings every post in line with the Project, including items removed
     // while the bot was down. Safe to run any time.
     async backfill() {
-      const counts = { created: 0, updated: 0, deleted: 0, skipped: 0 };
+      const counts = { created: 0, updated: 0, moved: 0, deleted: 0, skipped: 0 };
       const ids = await github.listItems(projectId);
       const seen = new Set(ids);
       const stale = (await store.all()).map((r) => r.itemId).filter((id) => !seen.has(id));

@@ -5,12 +5,16 @@ import { readFileSync } from 'node:fs';
 // (see config/anilounge.json) to tune them.
 export const DEFAULTS = {
   // Names of the Project's fields.
-  fields: { status: 'Status', difficulty: 'Difficulty', bounty: 'Bounty', area: 'Area' },
+  fields: { status: 'Status', difficulty: 'Difficulty', bounty: 'Bounty', area: 'Area', type: 'Type' },
   // Statuses that get a forum post. Any other status (including blank, Done)
   // removes it, as do closing the issue and removing it from the Project.
   postStatuses: ['Open', 'Claimed', 'In review'],
   // Status values the bot sets when a gig is claimed or released.
   statuses: { open: 'Open', claimed: 'Claimed' },
+  // Extra forum boards, routed by the Type field or labels (see boards.js).
+  // Gigs that match none go to the default board, DISCORD_GIG_CHANNEL_ID.
+  boards: [],
+  defaultBoard: 'Gigs',
   // Project "Area" value or issue label -> forum tag name.
   areaTags: {},
   // Other issue labels -> forum tag name.

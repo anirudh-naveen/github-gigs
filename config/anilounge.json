@@ -1,7 +1,12 @@
 {
-  "fields": { "status": "Status", "difficulty": "Difficulty", "bounty": "Bounty", "area": "Area" },
+  "fields": { "status": "Status", "difficulty": "Difficulty", "bounty": "Bounty", "area": "Area", "type": "Type" },
   "postStatuses": ["Open", "Claimed", "In review"],
   "statuses": { "open": "Open", "claimed": "Claimed" },
+  "boards": [
+    { "name": "Content", "channel": "$DISCORD_CONTENT_CHANNEL_ID", "types": ["Content"], "labels": ["content"] },
+    { "name": "Art", "channel": "$DISCORD_ART_CHANNEL_ID", "types": ["Art"], "labels": ["art"] }
+  ],
+  "defaultBoard": "Code",
   "areaTags": {
     "frontend": "Frontend",
     "backend": "Backend",

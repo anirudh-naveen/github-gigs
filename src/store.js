@@ -2,7 +2,7 @@
 // item leaves the Project, GitHub can no longer tell us), plus claim state.
 // `links` maps Discord users to verified GitHub logins.
 //
-// A gig row: { itemId, repo, number, threadId, status,
+// A gig row: { itemId, repo, number, threadId, channelId, status,
 //              claim:   { discordId, githubLogin, at } | null,
 //              pending: { discordId, githubLogin, at } | null }
 
@@ -21,6 +21,7 @@ ALTER TABLE gigs ADD COLUMN IF NOT EXISTS claimed_at timestamptz;
 ALTER TABLE gigs ADD COLUMN IF NOT EXISTS pending_discord_id text;
 ALTER TABLE gigs ADD COLUMN IF NOT EXISTS pending_github text;
 ALTER TABLE gigs ADD COLUMN IF NOT EXISTS requested_at timestamptz;
+ALTER TABLE gigs ADD COLUMN IF NOT EXISTS channel_id text;
 CREATE INDEX IF NOT EXISTS gigs_thread_id ON gigs (thread_id);
 
 CREATE TABLE IF NOT EXISTS links (
@@ -35,6 +36,7 @@ function fromRow(row) {
     repo: row.issue_repo,
     number: row.issue_number,
     threadId: row.thread_id,
+    channelId: row.channel_id,
     status: row.status,
     claim: row.claimed_by_discord_id
       ? { discordId: row.claimed_by_discord_id, githubLogin: row.claimed_by_github, at: row.claimed_at }
@@ -61,17 +63,18 @@ export function createPgStore(pool) {
     all: () => many('SELECT * FROM gigs ORDER BY issue_repo, issue_number'),
 
     // Sync fields only; claim state is left alone.
-    async save({ itemId, repo, number, threadId, status }) {
+    async save({ itemId, repo, number, threadId, channelId, status }) {
       await pool.query(
-        `INSERT INTO gigs (project_item_id, issue_repo, issue_number, thread_id, status)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO gigs (project_item_id, issue_repo, issue_number, thread_id, channel_id, status)
+         VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (project_item_id) DO UPDATE SET
            issue_repo = EXCLUDED.issue_repo,
            issue_number = EXCLUDED.issue_number,
            thread_id = EXCLUDED.thread_id,
+           channel_id = EXCLUDED.channel_id,
            status = EXCLUDED.status,
            updated_at = now()`,
-        [itemId, repo, number, threadId, status],
+        [itemId, repo, number, threadId, channelId, status],
       );
     },
     async remove(itemId) {
@@ -163,9 +166,9 @@ export function createMemoryStore() {
     async all() {
       return [...gigs.values()].map(copy);
     },
-    async save({ itemId, repo, number, threadId, status }) {
+    async save({ itemId, repo, number, threadId, channelId, status }) {
       const prev = gigs.get(itemId) || { claim: null, pending: null };
-      gigs.set(itemId, { ...prev, itemId, repo, number, threadId, status });
+      gigs.set(itemId, { ...prev, itemId, repo, number, threadId, channelId, status });
     },
     async remove(itemId) {
       gigs.delete(itemId);

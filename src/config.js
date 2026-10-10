@@ -1,3 +1,4 @@
+import { resolveBoards } from './boards.js';
 import { loadSettings } from './settings.js';
 
 // Reads settings from the environment. Secrets are never logged: errors name
@@ -28,6 +29,7 @@ export function loadConfig(env = process.env) {
   return {
     port: Number(env.PORT) || 3000,
     board,
+    boards: resolveBoards(board, env, env.DISCORD_GIG_CHANNEL_ID),
     discord: {
       applicationId: env.DISCORD_APPLICATION_ID,
       publicKey: env.DISCORD_PUBLIC_KEY,

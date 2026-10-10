@@ -70,7 +70,7 @@ test('github: getItem flattens the item and reuses the installation token', asyn
       repository: { nameWithOwner: 'o/r' }, labels: { nodes: [{ name: 'backend' }] },
       assignees: { nodes: [{ login: 'octo' }] },
     },
-    status: { name: 'Open' }, difficulty: { name: 'Easy' }, bounty: { text: '$5' }, area: null,
+    status: { name: 'Open' }, difficulty: { name: 'Easy' }, bounty: { text: '$5' }, area: null, type: { name: 'Art' },
   };
   const f = fakeFetch([
     [201, { token: 'inst', expires_at: later }],
@@ -78,11 +78,11 @@ test('github: getItem flattens the item and reuses the installation token', asyn
     [200, { data: { node: null }, errors: [{ type: 'NOT_FOUND', message: 'gone' }] }],
   ]);
   const gh = createGitHubClient({ appId: 1, privateKey: pem, installationId: 9 }, f.fn);
-  const fields = { status: 'Status', difficulty: 'Difficulty', bounty: 'Bounty', area: 'Area' };
+  const fields = { status: 'Status', difficulty: 'Difficulty', bounty: 'Bounty', area: 'Area', type: 'Type' };
   assert.deepEqual(await gh.getItem('PVTI_1', fields), {
     id: 'PVTI_1', projectId: 'PVT_1', isArchived: false,
     issue: { id: 'I_1', repo: 'o/r', number: 78, title: 'T', body: 'B', url: 'u', state: 'OPEN', labels: ['backend'], assignees: ['octo'] },
-    fields: { status: 'Open', difficulty: 'Easy', bounty: '$5', area: '' },
+    fields: { status: 'Open', difficulty: 'Easy', bounty: '$5', area: '', type: 'Art' },
   });
   assert.equal(await gh.getItem('PVTI_gone', fields), null);
   assert.equal(f.calls.filter((c) => c.url.endsWith('/access_tokens')).length, 1);

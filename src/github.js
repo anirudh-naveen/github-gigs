@@ -29,7 +29,7 @@ const VALUE = `
 `;
 
 const ITEM_QUERY = `
-query($id: ID!, $status: String!, $difficulty: String!, $bounty: String!, $area: String!) {
+query($id: ID!, $status: String!, $difficulty: String!, $bounty: String!, $area: String!, $type: String!) {
   node(id: $id) {
     ... on ProjectV2Item {
       id
@@ -48,6 +48,7 @@ query($id: ID!, $status: String!, $difficulty: String!, $bounty: String!, $area:
       difficulty: fieldValueByName(name: $difficulty) { ${VALUE} }
       bounty: fieldValueByName(name: $bounty) { ${VALUE} }
       area: fieldValueByName(name: $area) { ${VALUE} }
+      type: fieldValueByName(name: $type) { ${VALUE} }
     }
   }
 }`;
@@ -199,6 +200,7 @@ export function createGitHubClient(
           difficulty: fieldText(node.difficulty),
           bounty: fieldText(node.bounty),
           area: fieldText(node.area),
+          type: fieldText(node.type),
         },
       };
     },

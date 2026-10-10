@@ -138,7 +138,7 @@ async function run(result) {
 test('/claim outside a gig post, or before linking, explains what to do', async () => {
   const t = setup();
   const { thread } = await t.addGig(1);
-  assert.match((await run(await t.as('u1').command('claim', 'random'))).data.content, /inside a gig post/);
+  assert.match((await run(await t.as('u1').command('claim', 'random'))).data.content, /only works inside gig posts/);
   assert.match((await run(await t.as('u1').command('claim', thread))).data.content, /\/link/);
 });
 

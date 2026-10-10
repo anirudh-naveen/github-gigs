@@ -142,8 +142,10 @@ const discord = createServer(async (req, res) => {
   const path = req.url;
   log.push(`${req.method} ${path}`);
 
-  if (req.method === 'GET' && path === '/channels/forum') return send(200, { id: 'forum', available_tags: TAGS });
-  if (req.method === 'POST' && path === '/channels/forum/threads') {
+  let f = path.match(/^\/channels\/((?:content-|art-)?forum)$/);
+  if (req.method === 'GET' && f) return send(200, { id: f[1], available_tags: TAGS });
+  f = path.match(/^\/channels\/((?:content-|art-)?forum)\/threads$/);
+  if (req.method === 'POST' && f) {
     if (rateLimitOnce) {
       rateLimitOnce = false;
       return send(429, { retry_after: 0.05 });
@@ -151,7 +153,7 @@ const discord = createServer(async (req, res) => {
     assert.deepEqual(json.message.allowed_mentions, { parse: [] });
     assert.ok(json.name.length <= 100 && json.message.content.length <= 2000);
     const id = String(nextId++);
-    threads.set(id, { name: json.name, tags: json.applied_tags, content: json.message.content, archived: false });
+    threads.set(id, { forum: f[1], name: json.name, tags: json.applied_tags, content: json.message.content, archived: false });
     return send(201, { id });
   }
   let m = path.match(/^\/channels\/(\d+)$/);
@@ -203,6 +205,8 @@ const env = {
   DISCORD_MAINTAINER_ROLE_ID: 'maint',
   DISCORD_BOT_TOKEN: 'e2e-bot-token',
   DISCORD_GIG_CHANNEL_ID: 'forum',
+  DISCORD_CONTENT_CHANNEL_ID: 'content-forum',
+  DISCORD_ART_CHANNEL_ID: 'art-forum',
   DISCORD_API_URL: `http://127.0.0.1:${discordPort}`,
   GITHUB_APP_ID: '1',
   // As Railway would store it: one line with literal \n.
@@ -438,6 +442,21 @@ try {
     allowed_mentions: { parse: [], users: ['1001'] },
   }]);
   step('expiry -> kept at 6 days, released at 8 days with a ping in the thread');
+
+  // ---- Boards ----
+  assert.equal(threads.get(thread).forum, 'forum');
+  gig.type = { name: 'Art' };
+  await itemEvent('edited', 'PVTI_3');
+  await until('moved to Art', () => [...threads.values()].some((t) => t.forum === 'art-forum'));
+  assert.equal(threads.size, 1);
+  assert.ok(!threads.has(thread));
+  const artThread = [...threads.keys()][0];
+  assert.equal((await gigRow()).channel_id, 'art-forum');
+  assert.match((await as('1009').command('gigs')).data.content, new RegExp(`\\*\\*Art\\*\\*\\n- <#${artThread}>`));
+  items.set('PVTI_5', issueItem('PVTI_5', 85, { content: { labels: { nodes: [{ name: 'content' }] } } }));
+  await itemEvent('created', 'PVTI_5');
+  await until('content post', () => [...threads.values()].some((t) => t.forum === 'content-forum'));
+  step('Type = Art moves the post to the Art forum; content label routes to Content; /gigs groups by board');
 
   console.log(`\nall ${steps.length} steps passed`);
 } catch (err) {

@@ -24,6 +24,27 @@ and bring its forum post in line:
 - **Edits:** changes to the title, body, labels, or fields update the post in place.
   If someone deleted the post by hand, the bot reposts it.
 
+### Multiple boards
+
+Gigs can be split across several forum channels by type. Each entry in `boards`
+matches on the Project's **Type** field or on issue labels. The first match wins, and
+everything else goes to the default board (`DISCORD_GIG_CHANNEL_ID`, named by
+`defaultBoard`). AniLounge uses three forums: Content, Art, and Code (the default).
+
+```json
+"boards": [
+  { "name": "Content", "channel": "$DISCORD_CONTENT_CHANNEL_ID", "types": ["Content"], "labels": ["content"] },
+  { "name": "Art", "channel": "$DISCORD_ART_CHANNEL_ID", "types": ["Art"], "labels": ["art"] }
+],
+"defaultBoard": "Code"
+```
+
+`channel` is a channel ID, or `$NAME` to read it from an environment variable. If a
+gig's Type changes, the bot deletes the old post and reposts it on the new board,
+because Discord can't move posts between forums. Replies on the old post are lost,
+but any claim is kept. `/claim` works on every board, and `/gigs` groups gigs by board.
+Each forum needs its own copies of the tags it uses.
+
 Postgres stores which item owns which post, so the bot can still delete the post after
 the item is gone from the Project. `npm run backfill` (`railway run npm run backfill`
 on Railway) brings the whole board up to date. Run it once after setup, or any time
@@ -60,6 +81,10 @@ Rules (all configurable):
 - **Assigned on GitHub:** a gig assigned directly on GitHub shows as claimed by that
   person, and `/claim` refuses it.
 
+Contributor-facing text for AniLounge lives in [docs/anilounge](docs/anilounge). It
+includes a CONTRIBUTING.md section and the gig board's pinned post and guidelines.
+Other projects can adapt it.
+
 ## Routes
 
 | Route | What it does |
@@ -77,8 +102,10 @@ defaults in [src/settings.js](src/settings.js). AniLounge's file is
 
 | Key | Meaning | Default |
 | --- | --- | --- |
-| `fields` | Names of the Project's Status, Difficulty, Bounty, and Area fields | the same words |
+| `fields` | Names of the Project's Status, Difficulty, Bounty, Area, and Type fields | the same words |
 | `postStatuses` | Statuses that get a forum post | Open, Claimed, In review |
+| `boards` | Extra forums, routed by Type or labels (see [Multiple boards](#multiple-boards)) | `[]` |
+| `defaultBoard` | Name of the default board, used by `/gigs` | `Gigs` |
 | `areaTags` | Project "Area" value or issue label → forum tag name | `{}` |
 | `labelTags` | Other issue labels → forum tag name | `enhancement`→Feature, `bug`→Bug Fix |
 | `privateAreas` | Areas and labels never posted publicly | `["security"]` |
@@ -95,7 +122,8 @@ Difficulty tags use the Project's Difficulty value (for example `Easy`).
 
 1. **GitHub org.** Your repo and Project must belong to an organization, because
    GitHub only sends `projects_v2_item` webhooks for org-owned Projects. Create the
-   gig Project there (AniLounge's is **AniLounge Gigs**).
+   gig Project there (AniLounge's is **AniLounge Gigs**). For multiple boards, add a
+   single-select **Type** field (AniLounge: Code, Content, Art).
 2. **GitHub App** (for example `anilounge-bot`) on the org.
    - Repository permissions: Issues read/write, Metadata read.
    - Organization permissions: Projects read/write.
@@ -115,8 +143,10 @@ Difficulty tags use the Project's Difficulty value (for example `Easy`).
      Threads, and Manage Messages.
    - Find the forum's channel ID: it is the last number in
      `discord.com/channels/<guild>/<channel>`.
-   - Create the forum tags you use (for AniLounge: Frontend, Backend, Content Update,
-     Mobile, Feature, Bug Fix, Easy, Medium, Hard, Claimed).
+   - Create one forum channel per board (AniLounge: Code, Content, Art), each with
+     the tags it uses (for example Frontend, Backend, Content Update, Mobile,
+     Feature, Bug Fix, Easy, Medium, Hard, Claimed). Give the bot the permissions
+     above on every one.
    - Create Developer and Maintainer roles. Copy their IDs: turn on Developer Mode,
      then right-click each role.
 4. **Railway.** Add a Postgres database. The tables are created on startup. Set the

@@ -134,7 +134,9 @@ export function createClaims({ github, discord, store, sync, settings, config, l
   async function claimCommand(i) {
     const user = userOf(i);
     const row = await store.getByThread(i.channel_id);
-    if (!row) return reply(ephemeral('Run `/claim` inside a gig post.'));
+    if (!row) {
+      return reply(ephemeral('`/claim` only works inside gig posts the bot created. For other posts, reply in the post instead.'));
+    }
     if (row.claim) {
       return reply(ephemeral(row.claim.discordId === user ? 'You already have this gig.' : 'This gig is already claimed.'));
     }
@@ -167,7 +169,7 @@ export function createClaims({ github, discord, store, sync, settings, config, l
   async function unclaimCommand(i) {
     const user = userOf(i);
     const row = await store.getByThread(i.channel_id);
-    if (!row) return reply(ephemeral('Run `/unclaim` inside a gig post.'));
+    if (!row) return reply(ephemeral('`/unclaim` only works inside gig posts the bot created.'));
     if (row.pending?.discordId === user) {
       await store.clearPending(row.itemId);
       return reply(publicMessage(`<@${user}> withdrew their request. This gig is open again.`));
@@ -190,9 +192,13 @@ export function createClaims({ github, discord, store, sync, settings, config, l
       (r) => r.threadId && same(r.status, statuses.open) && !r.claim && !r.pending,
     );
     if (!open.length) return reply(ephemeral('No open gigs right now.'));
-    const lines = open.slice(0, 20).map((r) => `- <#${r.threadId}> (${r.repo}#${r.number})`);
-    if (open.length > 20) lines.push(`…and ${open.length - 20} more in the gig board.`);
-    return reply(ephemeral(`**Open gigs**\n${lines.join('\n')}`));
+    const shown = open.slice(0, 20);
+    const sections = sync.boards
+      .map((b) => [b.name, shown.filter((r) => sync.boardName(r.channelId) === b.name)])
+      .filter(([, rows]) => rows.length)
+      .map(([name, rows]) => `**${name}**\n${rows.map((r) => `- <#${r.threadId}> (${r.repo}#${r.number})`).join('\n')}`);
+    if (open.length > 20) sections.push(`…and ${open.length - 20} more on the boards.`);
+    return reply(ephemeral(sections.join('\n\n')));
   }
 
   async function linkCommand(i) {

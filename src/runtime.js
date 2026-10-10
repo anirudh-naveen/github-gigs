@@ -18,6 +18,7 @@ export async function createRuntime(config, log = console.log) {
     store,
     settings: config.board,
     channelId: config.discord.gigChannelId,
+    boards: config.boards,
     projectId: config.github.projectId,
     log,
   });

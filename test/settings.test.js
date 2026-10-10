@@ -1,0 +1,21 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { DEFAULTS, loadSettings } from '../src/settings.js';
+
+test('no path gives the generic defaults', () => {
+  assert.equal(loadSettings(undefined), DEFAULTS);
+});
+
+test('a config file overrides defaults deeply', () => {
+  const s = loadSettings('x', () => '{"claims":{"maxActivePerUser":3},"privateAreas":[]}');
+  assert.equal(s.claims.maxActivePerUser, 3);
+  assert.equal(s.claims.requireApproval, true);
+  assert.deepEqual(s.privateAreas, []);
+  assert.deepEqual(s.labelTags, DEFAULTS.labelTags);
+});
+
+test('the AniLounge config matches the agreed rules', () => {
+  const s = loadSettings('config/anilounge.json');
+  assert.deepEqual(s.claims, { requireApproval: true, maxActivePerUser: 2, expireDaysAfterLastCommit: 7 });
+  assert.equal(s.areaTags.content, 'Content Update');
+});

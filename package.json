@@ -1,0 +1,19 @@
+{
+  "name": "github-gigs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Keeps a Discord forum gig board in sync with a GitHub Project.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

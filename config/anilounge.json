@@ -1,0 +1,20 @@
+{
+  "areaTags": {
+    "frontend": "Frontend",
+    "backend": "Backend",
+    "content": "Content Update",
+    "security": "Security",
+    "mobile": "Mobile"
+  },
+  "labelTags": {
+    "enhancement": "Feature",
+    "bug": "Bug Fix"
+  },
+  "privateAreas": ["security"],
+  "claimedTag": "Claimed",
+  "claims": {
+    "requireApproval": true,
+    "maxActivePerUser": 2,
+    "expireDaysAfterLastCommit": 7
+  }
+}
